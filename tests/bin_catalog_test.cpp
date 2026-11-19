@@ -103,64 +103,88 @@ int main()
     }
 
     struct Backend : amiibo::NfcBackend {
-        const char* error = "Listener unavailable";
+        const char* init_error = "NFC initialization failed";
+        const char* error = nullptr;
+        const char* runtime_error = nullptr;
+        int initializations = 0;
         int starts = 0;
-        int stops = 0;
+        bool ready = false;
+        bool active = false;
         std::optional<amiibo::Image> received;
+        const char* initialize() override
+        {
+            ++initializations;
+            ready = !init_error;
+            return init_error;
+        }
         const char* start(const amiibo::Image& image) override
         {
             ++starts;
             received = image;
+            active = !error;
             return error;
         }
-        void stop() override { ++stops; }
+        void stop_session() override { active = false; }
+        void stop() override { active = ready = false; }
+        const char* poll_error() override { return runtime_error; }
     } backend;
 
     {
         amiibo::NfcFlow flow(dir.path, backend);
-        if (flow.enabled() || !flow.confirm() || backend.starts != 0) {
-            std::cerr << "NFC was active before explicit enable\n";
+        if (flow.enabled() || !flow.confirm() || backend.starts != 0 ||
+            !flow.enable() || flow.enabled() || backend.ready) {
+            std::cerr << "Failed initialization exposed the BIN browser\n";
             return 1;
         }
-        flow.enable();
-        if (!flow.confirm() || backend.starts != 0) {
-            std::cerr << "Invalid BIN reached NFC backend\n";
+        backend.init_error = nullptr;
+        if (flow.enable() || !flow.enabled() || !backend.ready || backend.starts != 0) {
+            std::cerr << "Browser did not wait for hardware initialization\n";
+            return 1;
+        }
+        const auto initializations = backend.initializations;
+        if (flow.enable() || backend.initializations != initializations ||
+            !flow.confirm() || backend.starts != 0) {
+            std::cerr << "Enable was not idempotent or invalid BIN reached backend\n";
             return 1;
         }
         flow.roles().highlight(role.filename());
-        if (!flow.confirm() || flow.listening() || backend.starts != 1 || backend.received != data) {
-            std::cerr << "Valid confirmation did not reach backend or failure was hidden\n";
-            return 1;
-        }
-    }
-    {
-        amiibo::NfcFlow flow(dir.path, backend);
-        flow.enable();
-        const auto& roles = flow.roles();
-        if (roles.catalog().entries[roles.focus()].path != role || flow.listening() || backend.starts != 1) {
-            std::cerr << "Last role should be highlighted but not automatically started\n";
+        backend.error = "Listener unavailable";
+        if (!flow.confirm() || flow.enabled() || backend.ready || backend.starts != 1 ||
+            backend.received != data) {
+            std::cerr << "Failed listener start did not return to disabled state\n";
             return 1;
         }
         backend.error = nullptr;
-        if (flow.confirm() || !flow.listening() || backend.starts != 2) {
-            std::cerr << "Confirm did not start a session\n";
+        if (flow.enable() || flow.roles().catalog().entries[flow.roles().focus()].path != role ||
+            flow.listening() || backend.starts != 1 || flow.confirm() || !flow.listening()) {
+            std::cerr << "Role confirmation or last-role restore failed\n";
             return 1;
         }
+        flow.stop_session();
+        if (!flow.enabled() || !backend.ready || backend.active || flow.listening() ||
+            flow.confirm() || !flow.listening()) {
+            std::cerr << "Returning to browser lost initialized hardware\n";
+            return 1;
+        }
+        backend.runtime_error = "SPI disconnected";
+        if (!flow.poll_error() || flow.enabled() || backend.ready || backend.active) {
+            std::cerr << "Hardware failure left the browser enabled\n";
+            return 1;
+        }
+        backend.runtime_error = nullptr;
+        if (flow.enable()) { return 1; }
         flow.disable();
-        if (flow.enabled() || backend.stops != 1) {
-            std::cerr << "Manual disable did not stop the session\n";
-            return 1;
-        }
-        flow.enable();
-        if (flow.confirm() || !flow.listening()) {
-            return 1;
-        }
+        if (flow.enabled() || backend.ready) { return 1; }
+        if (flow.enable() || flow.confirm()) { return 1; }
+    }
+    if (backend.ready || backend.active) {
+        std::cerr << "Exit did not release NFC hardware\n";
+        return 1;
     }
     fs::remove(role);
     amiibo::NfcFlow flow(dir.path, backend);
-    flow.enable();
-    if (backend.starts != 3 || backend.stops != 2 || flow.roles().focus() != 0) {
-        std::cerr << "Exit did not stop NFC or a missing saved role changed default focus\n";
+    if (flow.enable() || flow.roles().focus() != 0 || flow.listening()) {
+        std::cerr << "Missing saved role changed default focus or started listening\n";
         return 1;
     }
 }

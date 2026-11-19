@@ -1,6 +1,12 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(AmiiboZero VERSION 0.2.3 LANGUAGES CXX)
+project(AmiiboZero VERSION 0.3.1 LANGUAGES CXX)
+
+find_package(OpenSSL REQUIRED COMPONENTS Crypto)
+add_library(amiibo_crypto STATIC src/amiibo_crypto.cpp)
+target_compile_features(amiibo_crypto PUBLIC cxx_std_17)
+target_include_directories(amiibo_crypto PUBLIC src)
+target_link_libraries(amiibo_crypto PUBLIC OpenSSL::Crypto)
 
 add_library(bin_catalog STATIC src/bin_catalog.cpp src/nfc_flow.cpp)
 target_compile_features(bin_catalog PUBLIC cxx_std_17)
@@ -21,7 +27,19 @@ if(BUILD_TESTING)
     add_executable(bin_catalog_test tests/bin_catalog_test.cpp)
     target_link_libraries(bin_catalog_test PRIVATE bin_catalog)
     add_test(NAME bin_catalog COMMAND bin_catalog_test)
+    add_executable(ntag215_protocol_test tests/ntag215_protocol_test.cpp)
+    target_link_libraries(ntag215_protocol_test PRIVATE bin_catalog)
+    add_test(NAME ntag215_protocol COMMAND ntag215_protocol_test)
+    add_executable(amiibo_crypto_test tests/amiibo_crypto_test.cpp)
+    target_link_libraries(amiibo_crypto_test PRIVATE amiibo_crypto)
+    add_test(NAME amiibo_crypto COMMAND amiibo_crypto_test)
+    add_executable(uid_cycle_test tests/uid_cycle_test.cpp)
+    target_link_libraries(uid_cycle_test PRIVATE bin_catalog)
+    add_test(NAME uid_cycle COMMAND uid_cycle_test)
 endif()
+
+add_executable(amiibo_crypto_check EXCLUDE_FROM_ALL tests/crypto_device_check.cpp)
+target_link_libraries(amiibo_crypto_check PRIVATE amiibo_crypto bin_catalog)
 
 option(AMIIBOZERO_CARDPUTER "Build the Cardputer Zero LVGL application" OFF)
 if(AMIIBOZERO_CARDPUTER)

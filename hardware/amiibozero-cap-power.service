@@ -1,0 +1,13 @@
+[Unit]
+Description=Enable Cardputer Zero Cap NFC shared SPI power
+After=systemd-udev-trigger.service
+Before=systemd-user-sessions.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/libexec/amiibozero-cap-power
+RemainAfterExit=yes
+# No ExecStop: cutting Cap power can freeze the shared LCD SPI bus.
+
+[Install]
+WantedBy=multi-user.target

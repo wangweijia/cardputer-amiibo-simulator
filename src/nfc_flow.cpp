@@ -41,10 +41,14 @@ NfcFlow::NfcFlow(std::filesystem::path directory, NfcBackend& backend)
 {
 }
 
-void NfcFlow::enable()
+const char* NfcFlow::enable()
 {
     if (enabled()) {
-        return;
+        return nullptr;
+    }
+    if (const auto* error = backend_.initialize()) {
+        backend_.stop();
+        return error;
     }
     roles_.emplace(scan_bins(directory_));
     if (roles_->catalog().error) {
@@ -54,7 +58,7 @@ void NfcFlow::enable()
     const auto state_path = directory_ / last_role;
     std::error_code error;
     if (!std::filesystem::is_regular_file(std::filesystem::symlink_status(state_path, error))) {
-        return;
+        return nullptr;
     }
     std::ifstream in(state_path, std::ios::binary);
     char name[256];
@@ -62,18 +66,20 @@ void NfcFlow::enable()
     if (in.eof() && !in.bad() && in.gcount() > 0) {
         roles_->highlight(std::string(name, static_cast<std::size_t>(in.gcount())));
     }
+    return nullptr;
 }
 
 void NfcFlow::disable()
 {
-    stop_session();
+    backend_.stop();
+    listening_ = false;
     roles_.reset();
 }
 
 void NfcFlow::stop_session()
 {
     if (listening_) {
-        backend_.stop();
+        backend_.stop_session();
         listening_ = false;
     }
 }
@@ -99,6 +105,7 @@ const char* NfcFlow::confirm()
     }
     const auto* error = backend_.start(*roles_->selected_image());
     if (error) {
+        disable();
         return error;
     }
     listening_ = true;

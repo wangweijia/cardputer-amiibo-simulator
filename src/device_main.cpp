@@ -28,8 +28,8 @@ void stop(int)
     interrupted = 1;
 }
 
-constexpr std::array keys{KEY_Z, KEY_X, KEY_C, KEY_F, KEY_ESC, KEY_ENTER, KEY_N};
-constexpr std::array controls{'z', 'x', 'c', 'f', '\x1b', '\n', 'n'};
+constexpr std::array keys{KEY_Z, KEY_X, KEY_C, KEY_F, KEY_ESC, KEY_ENTER, KEY_N, KEY_R};
+constexpr std::array controls{'z', 'x', 'c', 'f', '\x1b', '\n', 'n', 'r'};
 
 int open_keypad()
 {
@@ -153,8 +153,9 @@ public:
     {
         if (!flow_.enabled()) {
             if (key == '\n') {
-                flow_.enable();
-                draw(nullptr);
+                lv_label_set_text(detail_, "Starting NFC...");
+                lv_refr_now(nullptr);
+                draw(flow_.enable());
             }
             return;
         }
@@ -166,6 +167,8 @@ public:
             if (key == 'z') {
                 flow_.stop_session();
                 draw(nullptr);
+            } else if (key == 'r') {
+                flow_.request_next_identity();
             }
         } else if (key == '\n') {
             draw(flow_.confirm());
@@ -181,9 +184,15 @@ public:
         if (const auto* error = flow_.poll_error()) {
             draw(error);
         }
+        if (const auto* status = flow_.status()) {
+            if (listening_status_ != status) {
+                listening_status_ = status;
+                lv_label_set_text(detail_, status);
+            }
+        }
         const char* text = input.holding() ? "Keep holding Esc to exit" :
             !flow_.enabled() ? "Enter: enable  |  Hold Esc 3s: exit" :
-            flow_.listening() ? "Z: stop/back  N: NFC off" :
+            flow_.listening() ? "R: next UID  Z: back  N: off" :
             "F/X: move  Z/C: page  N: NFC off";
         if (footer_text_ != text) {
             footer_text_ = text;
@@ -203,6 +212,7 @@ private:
 
     void draw(const char* feedback)
     {
+        listening_status_.clear();
         const bool listening = flow_.listening();
         const bool show = flow_.enabled() && !listening;
         if (listening && !spinner_) {
@@ -233,8 +243,9 @@ private:
             lv_label_set_text(title_, listening ? "NFC: listening" : "AmiiboZero");
             lv_obj_set_y(detail_, listening ? 94 : 52);
             lv_obj_set_style_text_align(detail_, listening ? LV_TEXT_ALIGN_CENTER : LV_TEXT_ALIGN_LEFT, 0);
-            lv_label_set_text(detail_, !flow_.enabled() ? "NFC is off.\nEnable NFC to choose a role BIN." :
-                                  feedback ? feedback : "Waiting for NFC reader...");
+            lv_label_set_text(detail_, feedback ? feedback :
+                !flow_.enabled() ? "NFC is off.\nEnable NFC to choose a role BIN." :
+                                  "Waiting for NFC reader...");
         }
     }
 
@@ -266,7 +277,7 @@ private:
             feedback = "No BIN files in the role directory.";
         } else if (!feedback) {
             feedback = catalog.entries[roles.focus()].status == amiibo::BinStatus::valid
-                ? "Enter: confirm and start NFC"
+                ? "Enter: use BIN and listen"
                 : amiibo::describe(catalog.entries[roles.focus()].status);
         }
         lv_label_set_text(list_status_, feedback);
@@ -281,6 +292,7 @@ private:
     lv_obj_t* list_status_{};
     lv_obj_t* spinner_{};
     const char* footer_text_ = nullptr;
+    std::string listening_status_;
 };
 
 lv_font_t* load_role_font()
@@ -338,7 +350,7 @@ int main(int argc, char** argv)
     }
 
     auto* role_font = load_role_font();
-    amiibo::CapListener backend;
+    amiibo::CapListener backend(directory);
     HomeScreen screen(std::move(directory), backend, role_font);
     DeviceInput input;
     bool resync = false;

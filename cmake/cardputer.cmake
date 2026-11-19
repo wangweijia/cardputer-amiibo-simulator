@@ -27,16 +27,26 @@ set_target_properties(amiibozero_device PROPERTIES OUTPUT_NAME amiibozero
 target_compile_features(amiibozero_device PRIVATE cxx_std_17)
 add_library(cap_listener STATIC src/cap_listener.cpp)
 target_compile_features(cap_listener PUBLIC cxx_std_17)
-target_link_libraries(cap_listener PUBLIC Threads::Threads)
+target_link_libraries(cap_listener PUBLIC Threads::Threads amiibo_crypto)
 target_link_libraries(amiibozero_device PRIVATE lvgl::lvgl bin_catalog cap_listener)
 
 add_executable(cap_listen_probe EXCLUDE_FROM_ALL src/cap_listen_probe.cpp)
 target_link_libraries(cap_listen_probe PRIVATE cap_listener)
+add_executable(cap_cycle_check EXCLUDE_FROM_ALL tests/cap_cycle_check.cpp)
+target_link_libraries(cap_cycle_check PRIVATE cap_listener bin_catalog)
+if(BUILD_TESTING)
+    add_executable(device_ui_test tests/device_ui_test.cpp)
+    target_link_libraries(device_ui_test PRIVATE lvgl::lvgl bin_catalog cap_listener)
+    add_test(NAME device_ui COMMAND device_ui_test)
+endif()
 
 install(TARGETS amiibozero_device RUNTIME DESTINATION bin)
 install(FILES assets/applications/amiibozero.desktop DESTINATION share/APPLaunch/applications)
 install(FILES assets/images/amiibozero.png DESTINATION share/APPLaunch/share/images)
 install(FILES "${lvgl_SOURCE_DIR}/LICENCE.txt" DESTINATION share/doc/amiibozero)
+install(FILES third_party/amiitool/LICENSE DESTINATION share/doc/amiibozero RENAME amiitool-LICENSE)
+install(FILES hardware/setup-cardputer.sh hardware/cap-power.sh
+    hardware/amiibozero-cap-power.service DESTINATION share/amiibozero/hardware)
 
 set(CPACK_GENERATOR DEB)
 set(CPACK_PACKAGING_INSTALL_PREFIX "/usr")

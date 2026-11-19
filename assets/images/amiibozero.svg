@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <rect width="256" height="256" rx="48" fill="#10182b"/>
+  <rect x="5" y="5" width="246" height="246" rx="43" fill="none" stroke="#334159" stroke-width="4"/>
+  <g stroke-width="12" stroke-linecap="round">
+    <path d="M74 69l-10-13" stroke="#ff6c73"/>
+    <path d="M128 65V49" stroke="#c1ec70"/>
+    <path d="M182 69l10-13" stroke="#4ab7ff"/>
+    <path d="M74 183l-10 13" stroke="#40d5a5"/>
+    <path d="M128 187v16" stroke="#ffb356"/>
+    <path d="M182 183l10 13" stroke="#ec82cb"/>
+  </g>
+  <text x="128" y="146" text-anchor="middle" fill="#fff"
+        font-family="Helvetica, sans-serif" font-weight="bold" font-size="58">amiibo</text>
+</svg>

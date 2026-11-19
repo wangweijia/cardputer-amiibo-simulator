@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=AmiiboZero
+Exec=/usr/bin/amiibozero
+Icon=share/images/amiibozero.png
+Terminal=false
+Type=Application

@@ -1,0 +1,13 @@
+# Build artifacts and caches
+/build/
+/build-*/
+/cmake-build-*/
+/CMakeUserPresets.json
+/.cache/
+
+# Local data and logs
+/tests/local-fixtures/
+*.[bB][iI][nN]
+*.log
+/.glab-chunks-*/
+.DS_Store
